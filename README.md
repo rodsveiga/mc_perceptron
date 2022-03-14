@@ -7,7 +7,7 @@
 Code for *Learning curves for the multi-class teacher-student perceptron*.
 
 <p float="center">
-  <img src="https://github.com/rodsveiga/mc+perceptron/blob/main/figures/mc_perc_red.jpg" height="350">
+  <img src="https://github.com/rodsveiga/mc_perceptron/blob/main/figures/mc_perc_red.jpg" height="350">
 </p>
 
 ## Prerequisites
@@ -16,7 +16,7 @@ Code for *Learning curves for the multi-class teacher-student perceptron*.
 
 # Structure
 
-In this repository we provide the code and some guided example to help the reader to reproduce the figures of the paper [1]. The repository is structured as follows.
+In this repository we provide the code and some guided example to help the reader to reproduce the figures of the paper [1]. The repository is structured as follows:
 
 | File                          | Description                                                                                                                                                    |
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
