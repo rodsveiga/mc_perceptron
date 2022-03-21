@@ -7,7 +7,7 @@
 Code for *Learning curves for the multi-class teacher-student perceptron*.
 
 <p float="center">
-  <img src="https://github.com/rodsveiga/mc_perceptron/blob/main/figures/mc_perc_red.jpg" height="350">
+  <img src="https://github.com/rodsveiga/mc_perceptron/blob/main/figures/ml_perc_red.jpg" height="350">
 </p>
 
 ## Prerequisites
