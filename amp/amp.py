@@ -4,7 +4,7 @@ from scipy.special import erf, erfc, erfcx
 from scipy.stats import norm
 from scipy.integrate import quad_vec, quad
 from sklearn.datasets import make_spd_matrix
-from nb_integrals_3 import I0_00, I1_00, I2_00, I0_10, I1_10, I2_10, I_norm
+from nb_integrals import I0_00, I1_00, I2_00, I0_10, I1_10, I2_10
 import time
 import sys
 np.random.seed(0)
@@ -16,11 +16,9 @@ class AMP():
         # Problem dimensions and inputs
         self.n = input_dim
         self.k = n_labels-1
-        #self.d = n_samples
         self.d = int(round(input_dim*alpha))
         self.var_noise = var_noise
         self.channel = channel
-        #self.alpha = n_samples / input_dim
         self.alpha = alpha
         self.prior = prior
         self.diff_W_ = []
@@ -63,11 +61,9 @@ class AMP():
             self.W_star = np.random.multivariate_normal(mean=np.zeros(self.k), cov= cov, size= self.n)
         if self.prior == 'rademacher':
             config = []
-
             for l in range(self.K0):
                 config.append(2.*np.array( [int(x) for x in list('{0:0b}'.format(l).zfill(self.k0))])-1.)
             config = np.array(config)
-
             # Balancing
             for l in range(self.k):
                 config[:, l] = config[:, l] +  config[:, self.k0-1]
@@ -107,7 +103,7 @@ class AMP():
         return x
 
 
-    def softmax(self, x, beta):
+    def softmax(self, x, beta=1.):
         """Compute softmax values"""
         e_x = np.exp(beta*(x - np.max(x)))
         return e_x / e_x.sum(axis=1)[:,None]
@@ -161,11 +157,8 @@ class AMP():
                 print('probit')
                 f_channel = self.f_ch_probit
 
-
         ## Convergence flag
         conv_tol = False
-        q0_th_flag = False
-        q1_th_flag = False
 
         ## Initialization close to the solution to check stability
         print('--- Initialization ---')
@@ -177,12 +170,10 @@ class AMP():
             print('W_hat0 ~ ' + self.prior)
             ov0 = np.dot(self.W_star.T, self.W_hat) / self.n
 
-
         print('initial overlap = ', ov0)
         print('   ')
 
         self.ovlap_matrix_.append(ov0)
-
 
         ## Initialize channel and prior matrice
         f_out = np.zeros((self.d, self.k))  / self.n
@@ -197,11 +188,6 @@ class AMP():
             t0 = time.time()
             # Channel: update the mean omega and variance V
             self.V = np.einsum('ijk,li->ljk', self.C_hat, self.Xsq)
-
-            #Vt = np.einsum('ijk->ikj', self.V)
-            #V_sym = (Vt + self.V) / 2.
-            #self.V = V_sym
-
             omega1 = np.einsum('ij, jk->ik', self.X, self.W_hat)
             omega2 = np.einsum('ijk,ik -> ij', self.V, f_out)
             self.omega = omega1 - omega2
@@ -234,40 +220,11 @@ class AMP():
                 self.W_hat = self._damping(self.W_hat, W_hat_old)
                 self.C_hat = self._damping(self.C_hat, C_hat_old)
 
-
-
-            ### TRY ###
-            #W_hat_ = np.copy(self.W_hat)
-            #C_hat_ = np.copy(self.C_hat)
-            #C_hat_diag = np.einsum('ijj->ij', self.C_hat)
-            #pairs = np.array([[-2.,-2.], [0.,0.], [-2.,0.], [0.,2.], [0.,-2.], [2.,0.], [0.,0.], [2.,2.]])
-
-            #for pair in pairs:
-            #    mask = np.divide(np.square(self.W_hat -np.tile(pair,(self.W_hat.shape[0],1))), C_hat_diag) < 1e-3
-            #    indexes = np.apply_along_axis(self.AND_gate, 1, mask)
-            #    if np.sum(indexes) > 0:
-            #        W_hat_[indexes] = pair
-            #        C_hat_[indexes] = np.eye(self.k) / np.sqrt(self.k)
-
-            #self.W_hat = np.copy(W_hat_)
-            #self.C_hat = np.copy(C_hat_)
-
-            ###################################
-
             # Metrics
             diff_W = np.mean(np.abs(W_hat_old - self.W_hat))
             mses_W = np.mean((self.W_hat - self.W_star)**2)
             self.diff_W_ .append(diff_W)
             ov = np.dot(self.W_star.T, self.W_hat) / self.n
-
-            #print(' ')
-            #print('-- debug-- ')
-            #print('W_hat=', self.W_hat)
-            #print('f_out=', f_out)
-            #print('df_out=', df_out)
-            #print(' ')
-
-            #if self.k==1: ov = ov[0][0]
             self.ovlap_matrix_.append(ov)
 
             # Iterarion status
@@ -277,22 +234,17 @@ class AMP():
             else:
                 print('alpha= %.8f | it= %d | diff_W= %.8f | mses = %.8f | time: %.3fs ' % (self.alpha, t, diff_W, mses_W, t1-t0))
 
-            #if t % 10 == 0:
-            #    print('overlap matrix = ', ov)
-
-            print('overlap matrix = ', ov)
-
+            if t % 10 == 0:
+                print('overlap matrix = ', ov)
 
             # Check for convergence
             if diff_W < conv:
                 conv_tol = True
                 break
 
-        #if t == max_iter-1:
         t1_total = time.time()
         print('Terminating AMP alpha= %.8f' % self.alpha)
 
-        #else:
         if conv_tol:
             print('mean(abs(W-W_old)) < %.5f' % conv)
         else:
@@ -310,14 +262,8 @@ class AMP():
         return self.diff_W_
 
 
-
     def f_prior_gauss(self, gamma, Lambda):
         """f0 and f0' for the Gaussian prior"""
-
-        #identity = np.zeros(Lambda.shape)
-        #np.einsum('jii->ij', identity)[:] = 1.
-        #L  = np.linalg.inv(Lambda + self.prior_reg*identity)
-
         L  = np.linalg.inv(Lambda + self.prior_reg*self.cov_inv)
         f0 =  np.einsum('ijk,ik -> ij', L , gamma)
 
@@ -326,7 +272,6 @@ class AMP():
 
     def f_prior_radem_k1(self, gamma, Lambda):
         """f0 and f0' for the Rademacher prior -- k=1"""
-
         identity = np.zeros(Lambda.shape)
         np.einsum('jii->ij', identity)[:] = 1
         f0 = np.tanh(gamma)
@@ -334,52 +279,6 @@ class AMP():
         return f0, df0
 
 
-    def f_prior_radem_k2_UNBALANCED(self, gamma, Lambda, exp_plus_thr=30):
-        """f0 and df0' for the Rademacher prior -- k>2"""
-
-        f0 = np.zeros(gamma.shape)
-        df0 = np.zeros(Lambda.shape)
-        Z = np.ones(gamma.shape[0])
-
-        config = []
-        K = 2**self.k
-
-        for l in range(K):
-            config.append(2.*np.array( [int(x) for x in list('{0:0b}'.format(l).zfill(self.k))])-1.)
-        config = np.array(config)
-        config2 = np.einsum('ij,ik-> ijk', config, config)
-
-        # Replicate for each configuration
-        w_ = np.tile(config, reps=[gamma.shape[0],1])
-        w2_ = np.tile(config2, reps=[gamma.shape[0],1,1])
-
-        gamma_ = np.tile(gamma, K).reshape(gamma.shape[0]*K, self.k)
-        Lambda_ = np.tile(Lambda, reps=[K,1]).reshape(Lambda.shape[0]*K, self.k, self.k)
-
-        gammaT_w_ = np.einsum('ij,ij->i', gamma_, w_)
-        Lambda_w_ = np.einsum('ijk,ij->ik', Lambda_, w_)
-        wT_Lambda_w_ =  np.einsum('ij,ij->i', w_, Lambda_w_)
-
-        expo = -0.5*wT_Lambda_w_ + gammaT_w_
-
-        expo[expo > exp_plus_thr] = 0
-        expo[expo < -exp_plus_thr] = 0
-
-        expo_ = np.exp(expo)
-        wexpo_ = np.einsum('i,ik-> ik', expo_, w_)
-        w2expo_ = np.einsum('i,ijk-> ijk', expo_, w2_)
-
-        Z = np.add.reduceat(expo_, np.arange(0, expo_.shape[0], K))
-        wexpo = np.add.reduceat(wexpo_, np.arange(0, wexpo_.shape[0], K))
-        w2expo = np.add.reduceat(w2expo_, np.arange(0, w2expo_.shape[0], K))
-
-        f0 = np.einsum('ij,i->ij', wexpo, 1/Z)
-        df0 = np.einsum('ijk,i-> ijk', w2expo, 1/Z) -  np.einsum('ij,ik -> ijk', f0 , f0)
-
-        return f0, df0
-
-
-    '''TRYING THE BINARY BALANCED PRIOR'''
     def f_prior_radem_k2(self, gamma, Lambda, exp_plus_thr=30):
         """f0 and df0' for the Rademacher prior -- k>2"""
 
@@ -387,23 +286,17 @@ class AMP():
         df0 = np.copy(self.C_hat)
         Z = np.zeros(gamma.shape[0])
 
-
-        #f0 = np.zeros(gamma.shape)
-        #df0 = np.zeros(Lambda.shape)
-        #Z = np.ones(gamma.shape[0])
-
         # Replicate for each configuration
         w_ = np.tile(self.config, reps=[gamma.shape[0],1])
         w2_ = np.tile(self.config2, reps=[gamma.shape[0],1,1])
-
         gamma_ = np.tile(gamma, self.K0).reshape(gamma.shape[0]*self.K0, self.k)
         Lambda_ = np.tile(Lambda, reps=[self.K0,1]).reshape(Lambda.shape[0]*self.K0, self.k, self.k)
 
         gammaT_w_ = np.einsum('ij,ij->i', gamma_, w_)
         Lambda_w_ = np.einsum('ijk,ij->ik', Lambda_, w_)
         wT_Lambda_w_ =  np.einsum('ij,ij->i', w_, Lambda_w_)
-
         expo = -0.5*wT_Lambda_w_ + gammaT_w_
+
         # Convenient shift (makes 0 < Z <=1 )
         expo = expo - np.max(expo)*np.ones(expo.shape)
 
@@ -449,11 +342,6 @@ class AMP():
         return f, df
 
 
-    def min_max(self, X, min_=-1., max_=1.):
-        X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
-        X_scaled = X_std * (max_ - min_) + min_
-        return X_scaled
-
 
     def parameters(self):
         """Estimator parameters"""
@@ -463,19 +351,6 @@ class AMP():
     def _parameter(self):
         """Ground truth"""
         return self.W_star
-
-
-    #def get_eg(self):
-    #    """Returns list of generalization error after fit"""
-    #    return self.eg_
-
-    def AND_gate(self, x):
-        '''ADN gate'''
-        if x[0] == 1 and x[1] == 1:
-            output = True
-        else:
-            output = False
-        return output
 
 
     def get_mses(self):
@@ -494,14 +369,10 @@ class AMP():
         f = np.zeros((self.d, self.k))
         df = np.zeros((self.d, self.k, self.k ))
 
-        #f = self.f_out_old
-        #df = self.df_out_old
-
         weight = None
         wvar = None
 
         for j in range(self.d):
-
             # Inverting V
             Vj = np.linalg.inv(V[j])
             wj = omega[j]
@@ -527,7 +398,7 @@ class AMP():
                 expoOmegaBeta = np.exp(-0.5*(Omegasqr- beta**2))
                 expoB = np.exp(-0.5*(beta**2))
 
-                ######## Numba scipy nquad
+                # Integrals
                 params = np.array([V22, Vb, w1, w2, alpha12])
                 I0 = nquad(I0_10, [[-alpha12,self.infinity]],params, opts=[{},{'weight': weight},{'wvar': wvar},{}])[0]
                 I1 = nquad(I1_10, [[-alpha12,self.infinity]],params, opts=[{},{'weight': weight},{'wvar': wvar},{}])[0]
@@ -565,7 +436,7 @@ class AMP():
                 expoA = np.exp(-0.5*(alpha21**2))
                 expoG = np.exp(-0.5*(gamma12**2))
 
-                ######## Numba scipy nquad
+                # Integrals
                 params = np.array([V22, Vb, w1, w2, alpha12])
                 I0 = nquad(I0_00, [[-self.infinity,-alpha12]],params, opts=[{},{'weight': weight},{'wvar': wvar},{}])[0]
                 I1 = nquad(I1_00, [[-self.infinity,-alpha12]],params, opts=[{},{'weight': weight},{'wvar': wvar},{}])[0]
@@ -601,7 +472,6 @@ class AMP():
             norm = 1./np.sqrt(2*np.pi*V[j])
             f_ = y[j]*norm*np.exp(-e_in**2) / np.maximum(self.tol, Z)
             df_ = -omega[j]*f_/V[j] - f_*f_
-
             f[j] = f_
             df[j] = df_
 
@@ -612,8 +482,7 @@ class AMP():
 
 
     def f_ch_probit(self, y, omega, V):
-        """Compute g and g' for probit channel"""
-
+        """Compute g and g' for probit channel (k=1)"""
         v = V.reshape(V.shape[0])
         y = y.reshape(y.shape[0])
         y = 2*y  - 1.
@@ -626,71 +495,3 @@ class AMP():
         dg = dg.reshape((dg.shape[0], 1, 1))
 
         return g, dg
-
-    def _I0_00(self, V22, Vb, w1, w2, alpha12, weight= None, wvar=None):
-        """I0 for y = (0,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            erf_in= (-u*Vb*w1/alpha12 + V22*w2)/np.sqrt(2*V22)
-            print('erf_in (00) = ', erf_in)
-            print('erfc (00) = ', erfc(erf_in))
-            return expo*erfc(erf_in)
-        return quad(integrand, -self.infinity,-alpha12, weight= weight, wvar=wvar)[0]
-
-    def _I1_00(self, V22, Vb, w1, w2, alpha12, weight= None, wvar=None):
-        """I1 for y = (0,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            erf_in= (-u*Vb*w1/alpha12 + V22*w2)/np.sqrt(2*V22)
-            print('erf_in (00) = ', erf_in)
-            print('erfc (00) = ', erfc(erf_in))
-            return expo*u*erfc(erf_in)
-        return quad(integrand, -self.infinity,-alpha12, weight= weight, wvar=wvar)[0]
-
-    def _I2_00(self, V22, Vb, w1, w2, alpha12, weight= None, wvar=None):
-        """I2 for y = (0,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            erf_in= (-u*Vb*w1/alpha12 + V22*w2)/np.sqrt(2*V22)
-            print('erf_in (00) = ', erf_in)
-            print('erfc (00) = ', erfc(erf_in))
-            return expo*u*u*erfc(erf_in)
-        return quad(integrand, -self.infinity,-alpha12, weight= weight, wvar=wvar)[0]
-
-    def _I0_10(self, V22, Vb, w1, w2, alpha12, weight= None, wvar=None):
-        """I0 for y = (1,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            erf_in= (-u*(Vb+V22)*w1/alpha12 + V22*(w2-w1))/np.sqrt(2*V22)
-            print('erf_in (10) = ', erf_in)
-            print('erfc (10) = ', erfc(erf_in))
-            return expo*erfc(erf_in)
-        return quad(integrand, -alpha12, self.infinity, weight= weight, wvar=wvar)[0]
-
-    def _I1_10(self, V22, Vb, w1, w2, alpha12, weight= None, wvar=None):
-        """I1 for y = (1,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            erf_in= (-u*(Vb+V22)*w1/alpha12 + V22*(w2-w1))/np.sqrt(2*V22)
-            print('erf_in (10) = ', erf_in)
-            print('erfc (10) = ', erfc(erf_in))
-            return expo*u*erfc(erf_in)
-        return quad(integrand, -alpha12, self.infinity, weight= weight, wvar=wvar)[0]
-
-    def _I2_10(self, V22, Vb, w1, w2, alpha12, weight= None, wvar=None):
-        """I2 for y = (1,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            erf_in= (-u*(Vb+V22)*w1/alpha12 + V22*(w2-w1))/np.sqrt(2*V22)
-            print('erf_in (10) = ', erf_in)
-            print('erfc (10) = ', erfc(erf_in))
-            return expo*u*u*erfc(erf_in)
-        return quad(integrand, -alpha12, self.infinity, weight= weight, wvar=wvar)[0]
-
-
-    def _I_norm(self, x, weight= None, wvar=None):
-        """I2 for y = (0,0)"""
-        def integrand(u):
-            expo= np.exp(-.5*(u**2))/np.sqrt(2.*np.pi)
-            return expo
-        return quad(integrand, -self.infinity, x, weight= weight, wvar=wvar)[0]
