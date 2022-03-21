@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.integrate import nquad, quad
-from scipy.special import erf, erfc, erfcx
+from scipy.integrate import nquad
+from scipy.special import erfc, erfcx
 from scipy.stats import norm
 from scipy.integrate import quad_vec, quad
 from sklearn.datasets import make_spd_matrix
@@ -38,9 +38,19 @@ class AMP():
 
         if prior == 'gauss':
             self.W_hat =  np.random.standard_normal((self.n, self.k)) / self.n
-        else:
+
+        if prior == 'rademacher':
+            # Possible configurations
+            config = []
+            for l in range(self.K0):
+                config.append(2.*np.array( [int(x) for x in list('{0:0b}'.format(l).zfill(self.k0))])-1.)
+            config = np.array(config)
+            # Balancing
+            for l in range(self.k):
+                config[:, l] = config[:, l] +  config[:, self.k0-1]
+            configs = np.delete(config, self.k0-1, axis=1)
             rng = np.random.default_rng()
-            self.W_hat = rng.choice([[-2., -2.], [ 0.,  0.], [-2.,  0.], [ 0.,  2.], [ 0., -2.], [ 2.,  0.], [ 0.,  0.], [ 2.,  2.]], self.n, replace=True) / self.n
+            self.W_hat = rng.choice(configs, self.n, replace=True) / self.n
 
         self.C_hat = np.array([make_spd_matrix(self.k) for j in range(self.n)]) / self.k
 
@@ -91,7 +101,6 @@ class AMP():
         print('  ')
         print('| | | | | AMP | | | | |')
         print(' ')
-
         print('--- Teacher weights ---')
         print('W_star= ', self.W_star)
         print(' ')
@@ -179,8 +188,6 @@ class AMP():
         f_out = np.zeros((self.d, self.k))  / self.n
         df_out = np.ones((self.d, self.k, self.k)) / self.k
 
-        damp_counter = -1
-
         print('--- Iterate AMP - alpha = %.8f ---' % self.alpha)
         ## Iterate AMP
         t0_total = time.time()
@@ -194,10 +201,8 @@ class AMP():
 
             self.f_out_old = np.copy(f_out)
             self.df_out_old = np.copy(df_out)
-
             # Update: f_out and df_out
             f_out, df_out = f_channel(self.y, self.omega, self.V)
-
 
             if bool(self.damping):
                 f_out = self._damping(f_out, self.f_out_old)
@@ -211,7 +216,6 @@ class AMP():
 
             W_hat_old = np.copy(self.W_hat)
             C_hat_old = np.copy(self.C_hat)
-
             # Update the estimate marginals
             self.W_hat, self.C_hat = f_prior(gamma, Lambda)
 
@@ -226,17 +230,14 @@ class AMP():
             self.diff_W_ .append(diff_W)
             ov = np.dot(self.W_star.T, self.W_hat) / self.n
             self.ovlap_matrix_.append(ov)
-
             # Iterarion status
             t1 = time.time()
             if self.k == 1:
                 print('alpha= %.8f | it= %d | diff_W= %.8f | time: %.3fs | ov= %.8f' % (self.alpha, t, diff_W, t1-t0, ov))
             else:
                 print('alpha= %.8f | it= %d | diff_W= %.8f | mses = %.8f | time: %.3fs ' % (self.alpha, t, diff_W, mses_W, t1-t0))
-
             if t % 10 == 0:
                 print('overlap matrix = ', ov)
-
             # Check for convergence
             if diff_W < conv:
                 conv_tol = True
@@ -266,7 +267,6 @@ class AMP():
         """f0 and f0' for the Gaussian prior"""
         L  = np.linalg.inv(Lambda + self.prior_reg*self.cov_inv)
         f0 =  np.einsum('ijk,ik -> ij', L , gamma)
-
         return f0, L
 
 
@@ -279,13 +279,11 @@ class AMP():
         return f0, df0
 
 
-    def f_prior_radem_k2(self, gamma, Lambda, exp_plus_thr=30):
+    def f_prior_radem_k2(self, gamma, Lambda):
         """f0 and df0' for the Rademacher prior -- k>2"""
-
         f0 = np.copy(self.W_hat)
         df0 = np.copy(self.C_hat)
         Z = np.zeros(gamma.shape[0])
-
         # Replicate for each configuration
         w_ = np.tile(self.config, reps=[gamma.shape[0],1])
         w2_ = np.tile(self.config2, reps=[gamma.shape[0],1,1])
@@ -307,7 +305,6 @@ class AMP():
         Z = np.add.reduceat(expo_, np.arange(0, expo_.shape[0], self.K0))
         wexpo = np.add.reduceat(wexpo_, np.arange(0, wexpo_.shape[0], self.K0))
         w2expo = np.add.reduceat(w2expo_, np.arange(0, w2expo_.shape[0], self.K0))
-
         # After the transition some components have Z -> 0, so we update just Z >0
         zero = 1e-100
         Z_red=  Z[Z>zero]
@@ -337,7 +334,6 @@ class AMP():
         f1 =  np.einsum('ijk,ik -> ij', df, omega)
         V3 = np.einsum('ijk,ikl->ijl', V_inv, Vs_)
         f2 =  np.einsum('ijk,ik -> ij', V3, y)
-
         f = f1 + f2
         return f, df
 
