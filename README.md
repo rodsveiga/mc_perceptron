@@ -13,6 +13,7 @@ Code for *Learning curves for the multi-class teacher-student perceptron*.
 ## Prerequisites
 
 - [python](https://www.python.org/) >= 3.6
+- [numba](https://numba.pydata.org/)
 
 # Structure
 

@@ -11,12 +11,12 @@ np.random.seed(0)
 
 class AMP():
 
-    def __init__(self, input_dim, n_labels, alpha, var_noise= 0.0, channel= 'argmax', prior= 'gauss', regul= 1., damping= 0., tol= 1e-10, infinity= 10.):
+    def __init__(self, n_samples, n_labels, alpha, var_noise= 0.0, channel= 'argmax', prior= 'gauss', regul= 1., damping= 0., tol= 1e-10, infinity= 10.):
         """Initialization"""
         # Problem dimensions and inputs
-        self.n = input_dim
+        self.n = n_samples
         self.k = n_labels-1
-        self.d = int(round(input_dim*alpha))
+        self.d = int(round(n_samples*alpha))
         self.var_noise = var_noise
         self.channel = channel
         self.alpha = alpha
@@ -125,10 +125,11 @@ class AMP():
         return y
 
 
-    def eg(self, n_samples):
-        n_samples = int(round(n_samples))
-        X_new = np.random.randn(n_samples, self.n) / np.sqrt(self.n)
-        noise = np.sqrt(self.var_noise) * np.random.randn(n_samples, self.k)
+    def eg(self, new_samples):
+        """Compute generalization error"""
+        new_samples = int(round(new_samples))
+        X_new = np.random.randn(new_samples, self.n) / np.sqrt(self.n)
+        noise = np.sqrt(self.var_noise) * np.random.randn(new_samples, self.k)
         ynew_t = self.f_teacher(np.matmul(X_new, self.W_star) + noise)
         ynew_s = self.f_teacher(np.matmul(X_new, self.W_hat) + noise)
 
