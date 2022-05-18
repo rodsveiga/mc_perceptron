@@ -17,7 +17,7 @@ Code for *Learning curves for the multi-class teacher-student perceptron*.
 
 # Structure
 
-In this repository we provide the code and some guided example to help the reader to reproduce the figures of the paper [1]. The repository is structured as follows:
+In this repository we provide the code and some guided example to help the reader to reproduce the results. The repository is structured as follows:
 
 | File                          | Description                                                                                                                                                    |
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -25,7 +25,3 @@ In this repository we provide the code and some guided example to help the reade
 | ```/amp``` | Approximate message passing                                |
 
 The notebooks are self-explanatory.
-
-## Reference
-
-[1] *Learning curves for the multi-class teacher-student perceptron*, Author1, Author2, Author3, Author4, Author5, and Author6, [arXiv:number](arXivlink) [stat.ML]
